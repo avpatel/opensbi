@@ -18,6 +18,7 @@ firmware-genflags-y += -DFW_TEXT_START=$(FW_TEXT_START)
 endif
 
 firmware-bins-$(FW_DYNAMIC) += fw_dynamic.bin
+firmware-genflags-$(FW_DYNAMIC) += -DFW_DYNAMIC
 
 firmware-bins-$(FW_JUMP) += fw_jump.bin
 ifdef FW_JUMP_ADDR

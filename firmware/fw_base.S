@@ -29,6 +29,7 @@ _start:
 	li	ra, 0
 	call	_reset_regs
 
+#ifdef FW_DYNAMIC
 	/* Allow main firmware to save info */
 	add	s0, a0, zero
 	add	s1, a1, zero
@@ -41,6 +42,7 @@ _start:
 	add	a2, s2, zero
 	add	a3, s3, zero
 	add	a4, s4, zero
+#endif
 
 	/* Preload HART details
 	 * s7 -> HART Count
