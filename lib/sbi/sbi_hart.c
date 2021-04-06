@@ -262,6 +262,12 @@ static inline char *sbi_hart_feature_id2string(unsigned long feature)
 	case SBI_HART_HAS_TIME:
 		fstr = "time";
 		break;
+	case SBI_HART_HAS_AIA:
+		fstr = "aia";
+		break;
+	case SBI_HART_HAS_AIA_IMSIC:
+		fstr = "imsic";
+		break;
 	default:
 		break;
 	}
@@ -425,6 +431,32 @@ __mhpm_skip:
 	csr_read_allowed(CSR_TIME, (unsigned long)&trap);
 	if (!trap.cause)
 		hfeatures->features |= SBI_HART_HAS_TIME;
+
+	/* Detect if hart has AIA local interrupt CSRs */
+	csr_read_allowed(CSR_MTOPI, (unsigned long)&trap);
+	if (trap.cause)
+		goto __aia_skip;
+	csr_read_allowed(CSR_MISELECT, (unsigned long)&trap);
+	if (trap.cause)
+		goto __aia_skip;
+	csr_write_allowed(CSR_MISELECT, (unsigned long)&trap, 0x30);
+	if (trap.cause)
+		goto __aia_skip;
+	val = csr_read_allowed(CSR_MIREG, (unsigned long)&trap);
+	if (trap.cause)
+		goto __aia_skip;
+	csr_write_allowed(CSR_MIREG, (unsigned long)&trap, val);
+	if (trap.cause)
+		goto __aia_skip;
+	hfeatures->features |= SBI_HART_HAS_AIA;
+__aia_skip:
+
+	/* Detect if hart has AIA IMSIC CSRs */
+	if (hfeatures->features & SBI_HART_HAS_AIA) {
+		csr_read_allowed(CSR_MCLAIMEI, (unsigned long)&trap);
+		if (!trap.cause)
+			hfeatures->features |= SBI_HART_HAS_AIA_IMSIC;
+	}
 }
 
 int sbi_hart_reinit(struct sbi_scratch *scratch)
