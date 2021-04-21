@@ -32,7 +32,8 @@ int fdt_find_match(void *fdt, int startoff,
 		   const struct fdt_match *match_table,
 		   const struct fdt_match **out_match);
 
-int fdt_get_node_addr_size(void *fdt, int node, unsigned long *addr,
+int fdt_get_node_addr_size(void *fdt, int node, int set,
+			   unsigned long *addr,
 			   unsigned long *size);
 
 int fdt_parse_hart_id(void *fdt, int cpu_offset, u32 *hartid);
