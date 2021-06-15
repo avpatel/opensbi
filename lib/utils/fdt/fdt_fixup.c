@@ -70,6 +70,15 @@ static void fdt_domain_based_fixup_one(void *fdt, int nodeoff)
 	}
 }
 
+void fdt_aplic_fixup(void *fdt)
+{
+	int noff = 0;
+
+	while ((noff = fdt_node_offset_by_compatible(fdt, noff,
+						     "riscv,aplic")) >= 0)
+		fdt_domain_based_fixup_one(fdt, noff);
+}
+
 void fdt_imsic_fixup(void *fdt)
 {
 	int noff = 0;
@@ -288,6 +297,8 @@ int fdt_reserved_memory_nomap_fixup(void *fdt)
 
 void fdt_fixups(void *fdt)
 {
+	fdt_aplic_fixup(fdt);
+
 	fdt_imsic_fixup(fdt);
 
 	fdt_plic_fixup(fdt);
