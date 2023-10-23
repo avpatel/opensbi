@@ -8,6 +8,7 @@
  */
 
 #include <sbi/sbi_console.h>
+#include <sbi/sbi_hart.h>
 #include <sbi/sbi_heap.h>
 #include <sbi/sbi_hsm.h>
 #include <sbi/sbi_irqchip.h>
@@ -510,6 +511,14 @@ int sbi_irqchip_init(struct sbi_scratch *scratch, bool cold_boot)
 	hd = sbi_scratch_thishart_offset_ptr(irqchip_hart_data_off);
 	if (hd && hd->chip && hd->chip->process_hwirqs)
 		csr_set(CSR_MIE, MIP_MEIP);
+
+	if (sbi_hart_has_extension(scratch, SBI_HART_EXT_SMAIA)) {
+#if __riscv_xlen == 32
+		csr_set(CSR_MIEH, MIPH_RASHP_INTP);
+#else
+		csr_set(CSR_MIE, MIP_RASHP_INTP);
+#endif
+	}
 
 	return 0;
 }
