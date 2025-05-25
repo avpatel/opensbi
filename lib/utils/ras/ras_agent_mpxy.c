@@ -20,6 +20,7 @@
 #include <sbi_utils/ras/riscv_reri_regs.h>
 #include <sbi_utils/ras/apei_tables.h>
 #include <sbi_utils/ras/ghes.h>
+#include <sbi_utils/ras/ras_agent_einj.h>
 #include <sbi_utils/mailbox/fdt_mailbox.h>
 #include <sbi_utils/mailbox/rpmi_mailbox.h>
 #include <sbi_utils/mpxy/fdt_mpxy_rpmi_mbox.h>
@@ -112,10 +113,15 @@ static int ras_handle_message(struct sbi_mpxy_channel *channel, u32 msg_id,
 {
 	int nr, nes;
 	u32 *src_list;
-	u32 src_id;
+	u32 src_id, inst_id;
+	u32 reg_id, reg_val_low, reg_val_high;
 	uint8_t *src_desc;
 	struct ras_rpmi_resp_hdr *rhdr = (struct ras_rpmi_resp_hdr *)respbuf;
 	u32 *nsrcs;
+	u32 *req;
+	u32 *resp_data;
+	u64 reg_val;
+	einj_inst_entry_t *inst = NULL;
 #define MAX_ID_BUF_SZ (sizeof(u32) * MAX_ERR_SRCS)
 
 	switch(msg_id) {
@@ -163,8 +169,97 @@ static int ras_handle_message(struct sbi_mpxy_channel *channel, u32 msg_id,
 		*resp_len = sizeof(*rhdr) + sizeof(acpi_ghesv2);
 		break;
 
+	case RAS_GET_EINJ_INFO:
+		if (!respbuf)
+			return SBI_EINVAL;
+
+		memset(respbuf, 0, resp_max_len);
+		nes = einj_get_total_injection_entries();
+		rhdr->flags = 0;
+		rhdr->status = RPMI_SUCCESS;
+		rhdr->remaining = 0;
+		rhdr->returned = cpu_to_le32(nes);
+
+		nsrcs = (u32 *)BUF_TO_DATA(respbuf);
+		*nsrcs = cpu_to_le32(nes);
+		*resp_len = sizeof(*rhdr) + (sizeof(u32));
+		break;
+
+	case RAS_GET_EINJ_INST:
+		if (!respbuf)
+			return SBI_EINVAL;
+
+		if (!msgbuf || msg_len < sizeof(u32))
+			return SBI_EINVAL;
+
+		if (resp_max_len <= sizeof(einj_inst_entry_t))
+			return SBI_ENOSPC;
+
+		req = (u32 *)msgbuf;
+		inst_id = req[0];
+
+		memset(respbuf, 0, resp_max_len);
+
+		inst = einj_get_instruction(inst_id);
+		if (inst == NULL) {
+			rhdr->status = RPMI_ERR_NO_DATA;
+		} else {
+			memcpy((void *)BUF_TO_DATA(respbuf), (void *)inst, sizeof(einj_inst_entry_t));
+			rhdr->flags = 0;
+			rhdr->status = RPMI_SUCCESS;
+			rhdr->remaining = 0;
+			rhdr->returned = sizeof(einj_inst_entry_t);
+		}
+		*resp_len = sizeof(*rhdr) + sizeof(einj_inst_entry_t);
+		break;
+
+	case RAS_EINJ_READ_REG:
+		resp_data = (u32 *)respbuf;
+
+		if (!respbuf || !resp_len || !msgbuf || msg_len < sizeof(u32))
+			return SBI_EINVAL;
+
+		if (resp_max_len < (sizeof(*rhdr) + (sizeof(u32) * 2))) {
+			resp_data[0] = RPMI_ERR_INVALID_PARAM;
+			return SBI_ENOSPC;
+		}
+
+		reg_id = ((u32 *)msgbuf)[0];
+
+		memset(respbuf, 0, resp_max_len);
+
+		if (einj_read_reg(reg_id, &reg_val) != SBI_SUCCESS) {
+			resp_data[0] = RPMI_ERR_FAILED;
+		} else {
+			resp_data[0] = RPMI_SUCCESS;
+			resp_data[1] = cpu_to_le32((u32)reg_val);
+			resp_data[2] = cpu_to_le32((u32)(reg_val >> 32));
+		}
+		*resp_len = (sizeof(u32) * 3);
+		break;
+
+	case RAS_EINJ_WRITE_REG:
+		resp_data = (u32 *)respbuf;
+
+		if (!msgbuf || msg_len < (sizeof(u32) * 3))
+			return SBI_EINVAL;
+
+		req = (u32 *)msgbuf;
+		reg_id = req[0];
+		reg_val_low = req[1];
+		reg_val_high = req[2];
+		reg_val = ((u64)reg_val_high << 32) | reg_val_low;
+
+		memset(respbuf, 0, resp_max_len);
+
+		if (einj_write_reg(reg_id, reg_val) != SBI_SUCCESS)
+			resp_data[0] = RPMI_ERR_FAILED;
+		else
+			resp_data[0] = RPMI_SUCCESS;
+		*resp_len = sizeof(u32);
+		break;
+
 	default:
-		sbi_printf("RAS Agent: Unknown service %u\n", msg_id);
 		return SBI_ENOENT;
 	}
 
