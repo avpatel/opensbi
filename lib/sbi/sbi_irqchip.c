@@ -13,24 +13,44 @@
 
 static SBI_LIST_HEAD(irqchip_list);
 
-static int default_irqfn(void)
-{
-	return SBI_ENODEV;
-}
-
-static int (*ext_irqfn)(void) = default_irqfn;
-
 int sbi_irqchip_process(void)
 {
-	return ext_irqfn();
+	struct sbi_irqchip_device *chip;
+	int rc = SBI_ENODEV;
+
+	sbi_list_for_each_entry(chip, &irqchip_list, node) {
+		if (!chip->process_hwirqs)
+			continue;
+		if (!sbi_hartmask_test_hartindex(current_hartindex(), &chip->target_harts))
+			continue;
+		rc = chip->process_hwirqs(chip);
+		if (rc)
+			break;
+	}
+
+	return rc;
 }
 
-void sbi_irqchip_add_device(struct sbi_irqchip_device *chip)
+int sbi_irqchip_add_device(struct sbi_irqchip_device *chip)
 {
-	sbi_list_add_tail(&chip->node, &irqchip_list);
+	struct sbi_irqchip_device *c;
+	struct sbi_hartmask hm;
 
-	if (chip->process_hwirqs)
-		ext_irqfn = chip->process_hwirqs;
+	if (!chip || !sbi_hartmask_weight(&chip->target_harts))
+		return SBI_EINVAL;
+
+	if (chip->process_hwirqs) {
+		sbi_list_for_each_entry(c, &irqchip_list, node) {
+			if (!c->process_hwirqs)
+				continue;
+			sbi_hartmask_and(&hm, &c->target_harts, &chip->target_harts);
+			if (sbi_hartmask_weight(&hm))
+				return SBI_EINVAL;
+		}
+	}
+
+	sbi_list_add_tail(&chip->node, &irqchip_list);
+	return 0;
 }
 
 int sbi_irqchip_init(struct sbi_scratch *scratch, bool cold_boot)
@@ -48,12 +68,14 @@ int sbi_irqchip_init(struct sbi_scratch *scratch, bool cold_boot)
 	sbi_list_for_each_entry(chip, &irqchip_list, node) {
 		if (!chip->warm_init)
 			continue;
+		if (!sbi_hartmask_test_hartindex(current_hartindex(), &chip->target_harts))
+			continue;
 		rc = chip->warm_init(chip);
 		if (rc)
 			return rc;
 	}
 
-	if (ext_irqfn != default_irqfn)
+	if (!sbi_list_empty(&irqchip_list))
 		csr_set(CSR_MIE, MIP_MEIP);
 
 	return 0;
@@ -61,6 +83,6 @@ int sbi_irqchip_init(struct sbi_scratch *scratch, bool cold_boot)
 
 void sbi_irqchip_exit(struct sbi_scratch *scratch)
 {
-	if (ext_irqfn != default_irqfn)
+	if (!sbi_list_empty(&irqchip_list))
 		csr_clear(CSR_MIE, MIP_MEIP);
 }
