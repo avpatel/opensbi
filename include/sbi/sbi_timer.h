@@ -10,7 +10,38 @@
 #ifndef __SBI_TIMER_H__
 #define __SBI_TIMER_H__
 
-#include <sbi/sbi_types.h>
+#include <sbi/sbi_list.h>
+
+/** Timer event abstraction */
+struct sbi_timer_event {
+	/** List head for per-HART event list (Internal) */
+	struct sbi_dlist head;
+
+	/** Hart on which the event is started / running (Internal) */
+	int hart_index;
+
+	/** Time stamp when the event expires (Internal) */
+	u64 time_stamp;
+
+	/** Event callback to be called upon expiry */
+	void (*callback)(struct sbi_timer_event *ev);
+
+	/** Event cleanup to be called upon sbi_hart_exit() */
+	void (*cleanup)(struct sbi_timer_event *ev);
+
+	/** Event specific private data */
+	void *priv;
+};
+
+#define SBI_INIT_TIMER_EVENT(__ptr, __callback, __cleanup, __priv)	\
+do {									\
+	SBI_INIT_LIST_HEAD(&(__ptr)->head);				\
+	(__ptr)->hart_index = -1;					\
+	(__ptr)->time_stamp = 0;					\
+	(__ptr)->callback = (__callback); 				\
+	(__ptr)->cleanup = (__cleanup); 				\
+	(__ptr)->priv = (__priv); 					\
+} while (0)
 
 /** Timer hardware device */
 struct sbi_timer_device {
@@ -86,8 +117,14 @@ void sbi_timer_set_delta(ulong delta);
 void sbi_timer_set_delta_upper(ulong delta_upper);
 #endif
 
-/** Start timer event for current HART */
-void sbi_timer_event_start(u64 next_event);
+/** Start timer event on current HART */
+void sbi_timer_event_start(struct sbi_timer_event *ev, u64 next_event);
+
+/** Stop timer event on current HART */
+void sbi_timer_event_stop(struct sbi_timer_event *ev);
+
+/** Start supervisor timer event on current HART */
+void sbi_timer_smode_event_start(u64 next_event);
 
 /** Process timer event for current HART */
 void sbi_timer_process(void);
