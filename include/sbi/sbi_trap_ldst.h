@@ -37,4 +37,6 @@ int sbi_misaligned_v_ld_emulator(int rlen, union sbi_ldst_data *out_val,
 int sbi_misaligned_v_st_emulator(int wlen, union sbi_ldst_data in_val,
 				 struct sbi_trap_context *tcntx);
 
+int sbi_misaligned_v_ldst_init(void);
+
 #endif

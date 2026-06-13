@@ -459,5 +459,13 @@ static int delegate_traps(struct sbi_scratch *scratch)
 
 int sbi_trap_init(struct sbi_scratch *scratch, bool cold_boot)
 {
+	int rc;
+
+	if (cold_boot) {
+		rc = sbi_misaligned_v_ldst_init();
+		if (rc)
+			return rc;
+	}
+
 	return delegate_traps(scratch);
 }

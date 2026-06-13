@@ -12,14 +12,44 @@
 #include <sbi/riscv_asm.h>
 #include <sbi/riscv_encoding.h>
 #include <sbi/sbi_error.h>
+#include <sbi/sbi_heap.h>
+#include <sbi/sbi_scratch.h>
 #include <sbi/sbi_trap_ldst.h>
 #include <sbi/sbi_trap.h>
 #include <sbi/sbi_unpriv.h>
-#include <sbi/sbi_trap.h>
 
 #ifdef OPENSBI_CC_SUPPORT_VECTOR
 
 #define VLEN_MAX 65536
+
+struct misaligned_v_ldst_data {
+	uint8_t mask[VLEN_MAX / 8];
+};
+
+static unsigned long misaligned_v_ldst_dataptr_offset;
+
+#define misaligned_v_ldst_get_data_ptr(__scratch)				\
+	sbi_scratch_read_type((__scratch), void *, misaligned_v_ldst_dataptr_offset)
+
+#define misaligned_v_ldst_set_data_ptr(__scratch, __ldst)			\
+	sbi_scratch_write_type((__scratch), void *, misaligned_v_ldst_dataptr_offset, (__ldst))
+
+static struct misaligned_v_ldst_data *misaligned_v_ldst_thishart_data_ptr(void)
+{
+	struct sbi_scratch *scratch = sbi_scratch_thishart_ptr();
+	struct misaligned_v_ldst_data *ptr;
+
+	if (!misaligned_v_ldst_dataptr_offset)
+		return NULL;
+
+	ptr = misaligned_v_ldst_get_data_ptr(scratch);
+	if (!ptr) {
+		ptr = sbi_zalloc(sizeof(*ptr));
+		misaligned_v_ldst_set_data_ptr(scratch, ptr);
+	}
+
+	return misaligned_v_ldst_get_data_ptr(sbi_scratch_thishart_ptr());
+}
 
 static inline void set_vreg(ulong vlenb, ulong which,
 			    ulong pos, ulong size, const uint8_t *bytes)
@@ -142,6 +172,7 @@ int sbi_misaligned_v_ld_emulator(int rlen, union sbi_ldst_data *out_val,
 {
 	const struct sbi_trap_info *orig_trap = &tcntx->trap;
 	struct sbi_trap_regs *regs = &tcntx->regs;
+	struct misaligned_v_ldst_data *hart_data;
 	struct sbi_trap_info uptrap;
 	ulong insn = sbi_get_insn(regs->mepc, &uptrap);
 	ulong vl = csr_read(CSR_VL);
@@ -157,12 +188,17 @@ int sbi_misaligned_v_ld_emulator(int rlen, union sbi_ldst_data *out_val,
 	ulong vlmul = GET_VLMUL(vtype);
 	bool illegal = GET_MEW(insn);
 	bool masked = IS_MASKED(insn);
-	uint8_t mask[VLEN_MAX / 8];
 	uint8_t bytes[8 * sizeof(uint64_t)];
 	ulong len = GET_LEN(view);
 	ulong nf = GET_NF(insn);
 	ulong vemul = GET_VEMUL(vlmul, view, vsew);
 	ulong emul = GET_EMUL(vemul);
+	uint8_t *mask;
+
+	hart_data = misaligned_v_ldst_thishart_data_ptr();
+	if (!hart_data)
+		return SBI_ENOMEM;
+	mask = hart_data->mask;
 
 	if (IS_UNIT_STRIDE_LOAD(insn) || IS_FAULT_ONLY_FIRST_LOAD(insn)) {
 		stride = nf * len;
@@ -242,6 +278,7 @@ int sbi_misaligned_v_st_emulator(int wlen, union sbi_ldst_data in_val,
 {
 	const struct sbi_trap_info *orig_trap = &tcntx->trap;
 	struct sbi_trap_regs *regs = &tcntx->regs;
+	struct misaligned_v_ldst_data *hart_data;
 	struct sbi_trap_info uptrap;
 	ulong insn = sbi_get_insn(regs->mepc, &uptrap);
 	ulong vl = csr_read(CSR_VL);
@@ -257,12 +294,17 @@ int sbi_misaligned_v_st_emulator(int wlen, union sbi_ldst_data in_val,
 	ulong vlmul = GET_VLMUL(vtype);
 	bool illegal = GET_MEW(insn);
 	bool masked = IS_MASKED(insn);
-	uint8_t mask[VLEN_MAX / 8];
 	uint8_t bytes[8 * sizeof(uint64_t)];
 	ulong len = GET_LEN(view);
 	ulong nf = GET_NF(insn);
 	ulong vemul = GET_VEMUL(vlmul, view, vsew);
 	ulong emul = GET_EMUL(vemul);
+	uint8_t *mask;
+
+	hart_data = misaligned_v_ldst_thishart_data_ptr();
+	if (!hart_data)
+		return SBI_ENOMEM;
+	mask = hart_data->mask;
 
 	if (IS_UNIT_STRIDE_STORE(insn)) {
 		stride = nf * len;
@@ -330,6 +372,15 @@ int sbi_misaligned_v_st_emulator(int wlen, union sbi_ldst_data in_val,
 
 	return vl;
 }
+
+int sbi_misaligned_v_ldst_init(void)
+{
+	misaligned_v_ldst_dataptr_offset = sbi_scratch_alloc_type_offset(void *);
+	if (!misaligned_v_ldst_dataptr_offset)
+		return SBI_ENOMEM;
+
+	return 0;
+}
 #else
 int sbi_misaligned_v_ld_emulator(int rlen, union sbi_ldst_data *out_val,
 				 struct sbi_trap_context *tcntx)
@@ -338,6 +389,10 @@ int sbi_misaligned_v_ld_emulator(int rlen, union sbi_ldst_data *out_val,
 }
 int sbi_misaligned_v_st_emulator(int wlen, union sbi_ldst_data in_val,
 				 struct sbi_trap_context *tcntx)
+{
+	return 0;
+}
+int sbi_misaligned_v_ldst_init(void)
 {
 	return 0;
 }
