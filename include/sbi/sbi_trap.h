@@ -291,6 +291,8 @@ struct sbi_trap_context *sbi_trap_handler(struct sbi_trap_context *tcntx);
 
 struct sbi_trap_context *sbi_trap_rnmi_handler(struct sbi_trap_context *tcntx);
 
+int sbi_trap_init(struct sbi_scratch *scratch, bool cold_boot);
+
 #endif
 
 #endif

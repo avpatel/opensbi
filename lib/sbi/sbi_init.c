@@ -309,6 +309,10 @@ static void __noreturn init_coldboot(struct sbi_scratch *scratch, u32 hartid)
 			__stack_chk_guard = guard_val;
 	}
 
+	rc = sbi_trap_init(scratch, true);
+	if (rc)
+		sbi_hart_hang();
+
 	rc = sbi_timer_init(scratch, true);
 	if (rc)
 		sbi_hart_hang();
@@ -463,6 +467,10 @@ static void __noreturn init_warm_startup(struct sbi_scratch *scratch,
 		sbi_hart_hang();
 
 	rc = sbi_hart_init(scratch, false);
+	if (rc)
+		sbi_hart_hang();
+
+	rc = sbi_trap_init(scratch, false);
 	if (rc)
 		sbi_hart_hang();
 

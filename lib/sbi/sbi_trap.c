@@ -414,3 +414,50 @@ struct sbi_trap_context *sbi_trap_rnmi_handler(struct sbi_trap_context *tcntx)
 	/* Never returns */
 	return tcntx;
 }
+
+static int delegate_traps(struct sbi_scratch *scratch)
+{
+	const struct sbi_platform *plat = sbi_platform_ptr(scratch);
+	unsigned long interrupts, exceptions;
+
+	if (!misa_extension('S'))
+		/* No delegation possible as mideleg does not exist */
+		return 0;
+
+	/* Send M-mode interrupts and most exceptions to S-mode */
+	interrupts = MIP_SSIP | MIP_STIP | MIP_SEIP;
+	interrupts |= sbi_pmu_irq_mask();
+
+	exceptions = (1U << CAUSE_MISALIGNED_FETCH) | (1U << CAUSE_BREAKPOINT) |
+		     (1U << CAUSE_USER_ECALL);
+	if (sbi_platform_has_mfaults_delegation(plat))
+		exceptions |= (1U << CAUSE_FETCH_PAGE_FAULT) |
+			      (1U << CAUSE_LOAD_PAGE_FAULT) |
+			      (1U << CAUSE_STORE_PAGE_FAULT) |
+			      (1U << CAUSE_SW_CHECK_EXCP);
+
+	/*
+	 * If hypervisor extension available then we only handle hypervisor
+	 * calls (i.e. ecalls from HS-mode) in M-mode.
+	 *
+	 * The HS-mode will additionally handle supervisor calls (i.e. ecalls
+	 * from VS-mode), Guest page faults and Virtual interrupts.
+	 */
+	if (misa_extension('H')) {
+		exceptions |= (1U << CAUSE_VIRTUAL_SUPERVISOR_ECALL);
+		exceptions |= (1U << CAUSE_FETCH_GUEST_PAGE_FAULT);
+		exceptions |= (1U << CAUSE_LOAD_GUEST_PAGE_FAULT);
+		exceptions |= (1U << CAUSE_VIRTUAL_INST_FAULT);
+		exceptions |= (1U << CAUSE_STORE_GUEST_PAGE_FAULT);
+	}
+
+	csr_write(CSR_MIDELEG, interrupts);
+	csr_write(CSR_MEDELEG, exceptions);
+
+	return 0;
+}
+
+int sbi_trap_init(struct sbi_scratch *scratch, bool cold_boot)
+{
+	return delegate_traps(scratch);
+}
