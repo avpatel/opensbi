@@ -115,58 +115,31 @@ static int sbi_ipi_sync(struct sbi_scratch *scratch, u32 event)
  * set to all online harts if the intention is to send IPIs to all the harts.
  * If hmask is zero, no IPIs will be sent.
  */
-int sbi_ipi_send_many(ulong hmask, ulong hbase, u32 event, void *data)
+int sbi_ipi_send_many(const struct sbi_hartmask *target_mask, u32 event, void *data)
 {
-	int rc = 0;
-	bool retry_needed;
-	ulong i;
-	struct sbi_hartmask target_mask;
-	struct sbi_domain *dom = sbi_domain_thishart_ptr();
 	struct sbi_scratch *scratch = sbi_scratch_thishart_ptr();
+	struct sbi_hartmask tmp_mask;
+	bool retry_needed;
+	int rc = 0;
+	ulong i;
 
-	if (hmask == 0 && hbase != -1UL) {
-		/* Nothing to do, but it's not an error either. */
-		return 0;
-	}
-
-	/* Find the target harts */
-	rc = sbi_hsm_hart_interruptible_mask(dom, &target_mask);
-	if (rc)
-		return rc;
-
-	if (hbase != -1UL) {
-		struct sbi_hartmask tmp_mask = { 0 };
-		struct sbi_hartmask domain_mask;
-		int count = sbi_popcount(hmask);
-
-		for (i = hbase; hmask; i++, hmask >>= 1) {
-			if (hmask & 1UL)
-				sbi_hartmask_set_hartid(i, &tmp_mask);
-		}
-
-		/* Validate hartids against domain assignment, not HSM state */
-		rc = sbi_domain_get_assigned_hartmask(dom, &domain_mask);
-		if (rc)
-			return rc;
-
-		sbi_hartmask_and(&domain_mask, &domain_mask, &tmp_mask);
-		if (sbi_hartmask_weight(&domain_mask) != count)
-			return SBI_EINVAL;
-
-		sbi_hartmask_and(&target_mask, &target_mask, &tmp_mask);
-	}
+	if (!target_mask)
+		return SBI_EINVAL;
 
 	/* Send IPIs */
+	sbi_hartmask_copy(&tmp_mask, target_mask);
 	do {
 		retry_needed = false;
-		sbi_hartmask_for_each_hartindex(i, &target_mask) {
+		sbi_hartmask_for_each_hartindex(i, &tmp_mask) {
+			if (!sbi_hsm_hart_is_interruptible(i))
+				continue;
 			rc = sbi_ipi_send(scratch, i, event, data);
 			if (rc < 0)
 				goto done;
 			if (rc == SBI_IPI_UPDATE_RETRY)
 				retry_needed = true;
 			else
-				sbi_hartmask_clear_hartindex(i, &target_mask);
+				sbi_hartmask_clear_hartindex(i, &tmp_mask);
 			rc = 0;
 		}
 	} while (retry_needed);
@@ -218,7 +191,15 @@ static u32 ipi_smode_event = SBI_IPI_EVENT_MAX;
 
 int sbi_ipi_send_smode(ulong hmask, ulong hbase)
 {
-	return sbi_ipi_send_many(hmask, hbase, ipi_smode_event, NULL);
+	struct sbi_hartmask target_mask;
+	int rc;
+
+	rc = sbi_domain_hartid_set_to_hartmask(sbi_domain_thishart_ptr(),
+					       hbase, hmask, true, &target_mask);
+	if (rc)
+		return rc;
+
+	return sbi_ipi_send_many(&target_mask, ipi_smode_event, NULL);
 }
 
 void sbi_ipi_clear_smode(void)
@@ -250,7 +231,15 @@ static u32 ipi_halt_event = SBI_IPI_EVENT_MAX;
 
 int sbi_ipi_send_halt(ulong hmask, ulong hbase)
 {
-	return sbi_ipi_send_many(hmask, hbase, ipi_halt_event, NULL);
+	struct sbi_hartmask target_mask;
+	int rc;
+
+	rc = sbi_domain_hartid_set_to_hartmask(sbi_domain_thishart_ptr(),
+					       hbase, hmask, false, &target_mask);
+	if (rc)
+		return rc;
+
+	return sbi_ipi_send_many(&target_mask, ipi_halt_event, NULL);
 }
 
 void sbi_ipi_process(void)

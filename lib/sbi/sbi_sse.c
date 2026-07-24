@@ -754,6 +754,7 @@ static struct sbi_ipi_event_ops sse_ipi_inject_ops = {
 static int sse_ipi_inject_send(unsigned long hartid, uint32_t event_id)
 {
 	int ret;
+	struct sbi_hartmask target_mask = { 0 };
 	struct sbi_scratch *remote_scratch = NULL;
 	struct sse_ipi_inject_data evt = {event_id};
 	struct sbi_fifo *sse_inject_fifo_r;
@@ -768,7 +769,8 @@ static int sse_ipi_inject_send(unsigned long hartid, uint32_t event_id)
 	if (ret)
 		return SBI_EFAIL;
 
-	ret = sbi_ipi_send_many(1, hartid, sse_ipi_inject_event, NULL);
+	sbi_hartmask_set_hartid(hartid, &target_mask);
+	ret = sbi_ipi_send_many(&target_mask, sse_ipi_inject_event, NULL);
 	if (ret)
 		return SBI_EFAIL;
 
@@ -815,9 +817,12 @@ static int sse_event_enable(struct sbi_sse_event *e)
 
 	sse_event_invoke_cb(e, enable_cb);
 
-	if (sse_event_is_global(e) && sse_event_pending(e))
-		sbi_ipi_send_many(1, e->attrs.hartid, sse_ipi_inject_event,
-				  NULL);
+	if (sse_event_is_global(e) && sse_event_pending(e)) {
+		struct sbi_hartmask target_mask = { 0 };
+
+		sbi_hartmask_set_hartid(e->attrs.hartid, &target_mask);
+		sbi_ipi_send_many(&target_mask, sse_ipi_inject_event, NULL);
+	}
 
 	return SBI_OK;
 }

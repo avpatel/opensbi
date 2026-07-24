@@ -40,6 +40,7 @@ enum sbi_ipi_update_type {
 };
 
 struct sbi_scratch;
+struct sbi_hartmask;
 
 /** IPI event operations or callbacks */
 struct sbi_ipi_event_ops {
@@ -74,7 +75,7 @@ struct sbi_ipi_event_ops {
 	void (* process)(struct sbi_scratch *scratch);
 };
 
-int sbi_ipi_send_many(ulong hmask, ulong hbase, u32 event, void *data);
+int sbi_ipi_send_many(const struct sbi_hartmask *target_mask, u32 event, void *data);
 
 int sbi_ipi_event_create(const struct sbi_ipi_event_ops *ops);
 

@@ -11,6 +11,7 @@
 #include <sbi/riscv_asm.h>
 #include <sbi/riscv_atomic.h>
 #include <sbi/riscv_barrier.h>
+#include <sbi/sbi_domain.h>
 #include <sbi/sbi_error.h>
 #include <sbi/sbi_fifo.h>
 #include <sbi/sbi_hart.h>
@@ -394,8 +395,16 @@ static const u32 tlb_type_to_pmu_fw_event[SBI_TLB_TYPE_MAX] = {
 
 int sbi_tlb_request(ulong hmask, ulong hbase, struct sbi_tlb_info *tinfo)
 {
+	struct sbi_hartmask target_mask;
+	int rc;
+
 	if (tinfo->type < 0 || tinfo->type >= SBI_TLB_TYPE_MAX)
 		return SBI_EINVAL;
+
+	rc = sbi_domain_hartid_set_to_hartmask(sbi_domain_thishart_ptr(),
+					       hbase, hmask, true, &target_mask);
+	if (rc)
+		return rc;
 
 	/*
 	 * If address range to flush is too big then simply
@@ -409,7 +418,7 @@ int sbi_tlb_request(ulong hmask, ulong hbase, struct sbi_tlb_info *tinfo)
 
 	sbi_pmu_ctr_incr_fw(tlb_type_to_pmu_fw_event[tinfo->type]);
 
-	return sbi_ipi_send_many(hmask, hbase, tlb_event, tinfo);
+	return sbi_ipi_send_many(&target_mask, tlb_event, tinfo);
 }
 
 int sbi_tlb_init(struct sbi_scratch *scratch, bool cold_boot)
