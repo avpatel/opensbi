@@ -264,6 +264,21 @@ int sbi_domain_get_assigned_hartmask(const struct sbi_domain *dom,
 				     struct sbi_hartmask *mask);
 
 /**
+ * Convert hartid set (hbase & hmask) to HART mask based on assigned or
+ * possible HART mask of a domain
+ * @param dom pointer to domain
+ * @param hbase base hartid
+ * @param hmask set of hartids relative to hbase
+ * @param use_assigned_harts whether to use assigned or possible HART mask
+ * @param mask the output hartmask to fill
+ * @return 0 on success and SBI_Exxx (< 0) on failure
+ */
+int sbi_domain_hartid_set_to_hartmask(const struct sbi_domain *dom,
+				      unsigned long hbase, unsigned hmask,
+				      bool use_assigned_harts,
+				      struct sbi_hartmask *mask);
+
+/**
  * Initialize a domain memory region based on it's physical
  * address and size.
  *

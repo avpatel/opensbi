@@ -92,6 +92,70 @@ int sbi_domain_get_assigned_hartmask(const struct sbi_domain *dom,
 	return ret;
 }
 
+int sbi_domain_hartid_set_to_hartmask(const struct sbi_domain *dom,
+				      unsigned long hbase, unsigned hmask,
+				      bool use_assigned_harts,
+				      struct sbi_hartmask *mask)
+{
+	struct sbi_domain *tdom = (struct sbi_domain *)dom;
+	unsigned long i, hartindex;
+
+	if (!mask || !dom)
+		return SBI_EINVAL;
+
+	if (hmask == 0 && hbase != -1UL) {
+		/* Nothing to do, but it's not an error either. */
+		sbi_hartmask_clear_all(mask);
+		return 0;
+	}
+
+	if (hbase != -1UL) {
+		sbi_hartmask_clear_all(mask);
+
+		if (use_assigned_harts)
+			spin_lock(&tdom->assigned_harts_lock);
+
+		for (i = hbase; hmask; i++, hmask >>= 1) {
+			if (!(hmask & BIT(0)))
+				continue;
+
+			hartindex = sbi_hartid_to_hartindex(i);
+			if (hartindex == SBI_HARTMASK_MAX_BITS) {
+				if (use_assigned_harts)
+					spin_unlock(&tdom->assigned_harts_lock);
+				return SBI_EINVAL;
+			}
+
+			if (use_assigned_harts) {
+				if (!sbi_hartmask_test_hartindex(hartindex,
+								 &tdom->assigned_harts)) {
+					spin_unlock(&tdom->assigned_harts_lock);
+					return SBI_EINVAL;
+				}
+			} else {
+				if (!sbi_hartmask_test_hartindex(hartindex,
+								 tdom->possible_harts))
+					return SBI_EINVAL;
+			}
+
+			sbi_hartmask_set_hartindex(hartindex, mask);
+		}
+
+		if (use_assigned_harts)
+			spin_unlock(&tdom->assigned_harts_lock);
+	} else {
+		if (use_assigned_harts) {
+			spin_lock(&tdom->assigned_harts_lock);
+			sbi_hartmask_copy(mask, &tdom->assigned_harts);
+			spin_unlock(&tdom->assigned_harts_lock);
+		} else {
+			sbi_hartmask_copy(mask, tdom->possible_harts);
+		}
+	}
+
+	return 0;
+}
+
 void sbi_domain_memregion_init(unsigned long addr,
 				unsigned long size,
 				unsigned long flags,
