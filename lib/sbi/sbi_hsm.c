@@ -109,6 +109,18 @@ static void hsm_start_ticket_release(struct sbi_hsm_data *hdata)
 	atomic_write(&hdata->start_ticket, 0);
 }
 
+bool sbi_hsm_hart_is_interruptible(u32 hartindex)
+{
+	int hstate = __sbi_hsm_hart_get_state(hartindex);
+
+	if (hstate != SBI_HSM_STATE_STARTED &&
+	    hstate != SBI_HSM_STATE_SUSPENDED &&
+	    hstate != SBI_HSM_STATE_RESUME_PENDING)
+		return false;
+
+	return true;
+}
+
 /**
  * Get the mask of harts which are valid IPI targets
  * @param dom the domain to be used for output HART mask
@@ -118,7 +130,7 @@ static void hsm_start_ticket_release(struct sbi_hsm_data *hdata)
 int sbi_hsm_hart_interruptible_mask(const struct sbi_domain *dom,
 				    struct sbi_hartmask *mask)
 {
-	int hstate, ret;
+	int ret;
 	u32 i;
 
 	ret = sbi_domain_get_assigned_hartmask(dom, mask);
@@ -126,10 +138,7 @@ int sbi_hsm_hart_interruptible_mask(const struct sbi_domain *dom,
 		return ret;
 
 	sbi_hartmask_for_each_hartindex(i, mask) {
-		hstate = __sbi_hsm_hart_get_state(i);
-		if (hstate != SBI_HSM_STATE_STARTED &&
-		    hstate != SBI_HSM_STATE_SUSPENDED &&
-		    hstate != SBI_HSM_STATE_RESUME_PENDING)
+		if (!sbi_hsm_hart_is_interruptible(i))
 			sbi_hartmask_clear_hartindex(i, mask);
 	}
 
