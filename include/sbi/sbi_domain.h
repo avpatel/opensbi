@@ -255,15 +255,6 @@ extern struct sbi_dlist domain_list;
 bool sbi_domain_is_assigned_hart(const struct sbi_domain *dom, u32 hartindex);
 
 /**
- * Get the assigned HART mask for given domain
- * @param dom pointer to domain
- * @param mask the output hartmask to fill
- * @return 0 on success and SBI_Exxx (< 0) on failure
- */
-int sbi_domain_get_assigned_hartmask(const struct sbi_domain *dom,
-				     struct sbi_hartmask *mask);
-
-/**
  * Convert hartid set (hbase & hmask) to HART mask based on assigned or
  * possible HART mask of a domain
  * @param dom pointer to domain
