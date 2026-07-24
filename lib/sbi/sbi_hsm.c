@@ -121,30 +121,6 @@ bool sbi_hsm_hart_is_interruptible(u32 hartindex)
 	return true;
 }
 
-/**
- * Get the mask of harts which are valid IPI targets
- * @param dom the domain to be used for output HART mask
- * @param mask the output hartmask to fill
- * @return 0 on success and SBI_Exxx (< 0) on failure
- */
-int sbi_hsm_hart_interruptible_mask(const struct sbi_domain *dom,
-				    struct sbi_hartmask *mask)
-{
-	int ret;
-	u32 i;
-
-	ret = sbi_domain_get_assigned_hartmask(dom, mask);
-	if (ret)
-		return ret;
-
-	sbi_hartmask_for_each_hartindex(i, mask) {
-		if (!sbi_hsm_hart_is_interruptible(i))
-			sbi_hartmask_clear_hartindex(i, mask);
-	}
-
-	return 0;
-}
-
 void __noreturn sbi_hsm_hart_start_finish(struct sbi_scratch *scratch,
 					  u32 hartid)
 {
