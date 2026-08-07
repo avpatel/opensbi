@@ -207,15 +207,14 @@ The DT properties of a domain instance DT node are as follows:
 
 ### Assigning HART To Domain Instance
 
-By default, all HARTs are assigned to **the ROOT domain**. The OpenSBI
-platform support can provide the HART to domain instance assignment using
-platform specific callback.
+At boot-time, a HART is assigned to a non-ROOT domain on first come
+first serve basis if the HART is listed as a possible HART of the
+non-ROOT domain. If no non-ROOT domain list a HART as possible HART
+then the HART is assigned to **the ROOT domain**.
 
-The HART to domain instance assignment can be parsed from the device tree
-using optional DT property **opensbi-domain** in each CPU DT node. The
-value of DT property **opensbi-domain** is the DT phandle of the domain
-instance DT node. If **opensbi-domain** DT property is not specified then
-corresponding HART is assigned to **the ROOT domain**.
+At runtime, the assignment of a HART can change from one domain to
+another domain as long as the HART is listed in possible HARTs of
+both domains.
 
 ### Domain Configuration Only Accessible to OpenSBI
 
@@ -289,7 +288,6 @@ be done:
             device_type = "cpu";
             reg = <0x00>;
             compatible = "riscv";
-            opensbi-domain = <&tdomain>;
             ...
         };
 
@@ -297,7 +295,6 @@ be done:
             device_type = "cpu";
             reg = <0x01>;
             compatible = "riscv";
-            opensbi-domain = <&udomain>;
             ...
         };
 
@@ -305,7 +302,6 @@ be done:
             device_type = "cpu";
             reg = <0x02>;
             compatible = "riscv";
-            opensbi-domain = <&udomain>;
             ...
         };
 
@@ -313,7 +309,6 @@ be done:
             device_type = "cpu";
             reg = <0x03>;
             compatible = "riscv";
-            opensbi-domain = <&udomain>;
             ...
         };
 
@@ -321,7 +316,6 @@ be done:
             device_type = "cpu";
             reg = <0x04>;
             compatible = "riscv";
-            opensbi-domain = <&udomain>;
             ...
         };
     };
