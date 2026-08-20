@@ -580,7 +580,7 @@ int sbi_dbtr_read_trig(unsigned long smode,
 
 	shmem_base = hart_shmem_base(hs);
 
-	sbi_hart_protection_map_range((unsigned long)shmem_base,
+	sbi_hart_protection_temp_map_range((unsigned long)shmem_base,
 				      trig_count * sizeof(*entry));
 	for_each_trig_entry(shmem_base, trig_count, typeof(*entry), entry) {
 		xmit = &entry->data;
@@ -594,7 +594,7 @@ int sbi_dbtr_read_trig(unsigned long smode,
 		xmit->tdata2 = cpu_to_lle(trig->tdata2);
 		xmit->tdata3 = cpu_to_lle(trig->tdata3);
 	}
-	sbi_hart_protection_unmap_range((unsigned long)shmem_base,
+	sbi_hart_protection_temp_unmap_range((unsigned long)shmem_base,
 					trig_count * sizeof(*entry));
 
 	return SBI_SUCCESS;
@@ -620,7 +620,7 @@ int sbi_dbtr_install_trig(unsigned long smode,
 		return SBI_ERR_NO_SHMEM;
 
 	shmem_base = hart_shmem_base(hs);
-	sbi_hart_protection_map_range((unsigned long)shmem_base,
+	sbi_hart_protection_temp_map_range((unsigned long)shmem_base,
 				      trig_count * sizeof(*entry));
 
 	/*
@@ -639,14 +639,14 @@ int sbi_dbtr_install_trig(unsigned long smode,
 
 		if (!dbtr_trigger_supported(TDATA1_GET_TYPE(ctrl))) {
 			*out = _idx;
-			sbi_hart_protection_unmap_range((unsigned long)shmem_base,
+			sbi_hart_protection_temp_unmap_range((unsigned long)shmem_base,
 							trig_count * sizeof(*entry));
 			return SBI_ERR_FAILED;
 		}
 
 		if (!dbtr_trigger_valid(TDATA1_GET_TYPE(ctrl), ctrl)) {
 			*out = _idx;
-			sbi_hart_protection_unmap_range((unsigned long)shmem_base,
+			sbi_hart_protection_temp_unmap_range((unsigned long)shmem_base,
 							trig_count * sizeof(*entry));
 			return SBI_ERR_FAILED;
 		}
@@ -654,7 +654,7 @@ int sbi_dbtr_install_trig(unsigned long smode,
 		if ((recv->tdata2 && !tdata2_impl) ||
 		    (recv->tdata3 && !tdata3_impl)) {
 			*out = _idx;
-			sbi_hart_protection_unmap_range((unsigned long)shmem_base,
+			sbi_hart_protection_temp_unmap_range((unsigned long)shmem_base,
 							trig_count * sizeof(*entry));
 			return SBI_ERR_NOT_SUPPORTED;
 		}
@@ -662,7 +662,7 @@ int sbi_dbtr_install_trig(unsigned long smode,
 
 	if (hs->available_trigs < trig_count) {
 		*out = hs->available_trigs;
-		sbi_hart_protection_unmap_range((unsigned long)shmem_base,
+		sbi_hart_protection_temp_unmap_range((unsigned long)shmem_base,
 					       trig_count * sizeof(*entry));
 		return SBI_ERR_FAILED;
 	}
@@ -684,7 +684,7 @@ int sbi_dbtr_install_trig(unsigned long smode,
 
 	}
 
-	sbi_hart_protection_unmap_range((unsigned long)shmem_base,
+	sbi_hart_protection_temp_unmap_range((unsigned long)shmem_base,
 					trig_count * sizeof(*entry));
 
 	return SBI_SUCCESS;
@@ -768,29 +768,29 @@ int sbi_dbtr_update_trig(unsigned long smode,
 	tdata3_impl = tdata_implemented(CSR_TDATA3);
 
 	for_each_trig_entry(shmem_base, trig_count, typeof(*entry), entry) {
-		sbi_hart_protection_map_range((unsigned long)entry, sizeof(*entry));
+		sbi_hart_protection_temp_map_range((unsigned long)entry, sizeof(*entry));
 		trig_idx = entry->id.idx;
 
 		if (trig_idx >= hs->total_trigs) {
-			sbi_hart_protection_unmap_range((unsigned long)entry, sizeof(*entry));
+			sbi_hart_protection_temp_unmap_range((unsigned long)entry, sizeof(*entry));
 			return SBI_ERR_INVALID_PARAM;
 		}
 
 		trig = INDEX_TO_TRIGGER(trig_idx);
 
 		if (!(trig->state & RV_DBTR_BIT_MASK(TS, MAPPED))) {
-			sbi_hart_protection_unmap_range((unsigned long)entry, sizeof(*entry));
+			sbi_hart_protection_temp_unmap_range((unsigned long)entry, sizeof(*entry));
 			return SBI_ERR_FAILED;
 		}
 
 		if ((entry->data.tdata2 && !tdata2_impl) ||
 		    (entry->data.tdata3 && !tdata3_impl)) {
-			sbi_hart_protection_unmap_range((unsigned long)entry, sizeof(*entry));
+			sbi_hart_protection_temp_unmap_range((unsigned long)entry, sizeof(*entry));
 			return SBI_ERR_NOT_SUPPORTED;
 		}
 
 		dbtr_trigger_setup(trig, &entry->data);
-		sbi_hart_protection_unmap_range((unsigned long)entry, sizeof(*entry));
+		sbi_hart_protection_temp_unmap_range((unsigned long)entry, sizeof(*entry));
 		dbtr_trigger_enable(trig);
 	}
 
