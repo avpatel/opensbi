@@ -47,6 +47,12 @@ SECTIONS
 		PROVIDE(_rodata_end = .);
 	}
 
+	.rela.dyn : {
+		PROVIDE(__rela_dyn_start = .);
+		*(.rela*)
+		PROVIDE(__rela_dyn_end = .);
+	}
+
 	/* End of the read-only data sections */
 
 	. = ALIGN(0x1000); /* Ensure next section is page aligned */

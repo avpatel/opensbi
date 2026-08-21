@@ -7,6 +7,7 @@
  *   Anup Patel <anup.patel@wdc.com>
  */
 
+#include <sbi/riscv_elf.h>
 #include <sbi/riscv_encoding.h>
 #define __ASM_STR(x)	x
 
@@ -23,6 +24,13 @@
 #define REG_L		__REG_SEL(ld, lw)
 #define REG_S		__REG_SEL(sd, sw)
 #define REG_ADDW	__REG_SEL(addw, add)
+
+/* Link time address of _payload_start, see test.elf.ldS */
+#ifdef FW_PAYLOAD_OFFSET
+#define PAYLOAD_LINK_START	(FW_TEXT_START + FW_PAYLOAD_OFFSET)
+#else
+#define PAYLOAD_LINK_START	0
+#endif
 
 	.section .entry, "ax", %progbits
 	.align 3
@@ -44,6 +52,28 @@ _sc_fail:
 #error "need a or zalrsc"
 #endif
 	bnez	a3, _start_hang
+
+	/* relocate the global table content */
+	li	t0, PAYLOAD_LINK_START	/* link start */
+	lla	t1, _payload_start	/* load start */
+	sub	t2, t1, t0		/* load offset */
+	lla	t0, __rela_dyn_start
+	lla	t1, __rela_dyn_end
+	beq	t0, t1, _relocate_done
+2:
+	REG_L	t5, __SIZEOF_LONG__(t0)	/* t5 <-- relocation info:type */
+	li	t3, R_RISCV_RELATIVE	/* reloc type R_RISCV_RELATIVE */
+	bne	t5, t3, 3f
+	REG_L	t3, 0(t0)
+	REG_L	t5, (__SIZEOF_LONG__ * 2)(t0)	/* t5 <-- addend */
+	add	t5, t5, t2
+	add	t3, t3, t2
+	REG_S	t5, 0(t3)		/* store runtime address to the GOT entry */
+
+3:
+	addi	t0, t0, (__SIZEOF_LONG__ * 3)
+	blt	t0, t1, 2b
+_relocate_done:
 
 	/* Save a0 and a1 */
 	lla	a3, _boot_a0
