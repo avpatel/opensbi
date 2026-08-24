@@ -856,6 +856,7 @@ int sbi_domain_startup(struct sbi_scratch *scratch, u32 cold_hartid)
 int sbi_domain_finalize(struct sbi_scratch *scratch)
 {
 	int rc;
+	struct sbi_domain *dom;
 	const struct sbi_platform *plat = sbi_platform_ptr(scratch);
 
 	/* Sanity checks */
@@ -875,6 +876,21 @@ int sbi_domain_finalize(struct sbi_scratch *scratch)
 	 * regions can't be changed.
 	 */
 	domain_finalized = true;
+
+	/*
+	 * Finalize per-domain state of each domain. Now all domains
+	 * are finalized already and their memory regions are final.
+	 * State which is derived from the domain memory regions is
+	 * set up below.
+	 */
+	sbi_domain_for_each(dom) {
+		rc = sbi_domain_finalize_state(dom);
+		if (rc) {
+			sbi_printf("%s: domain state finalize failed for %s"
+				   " (error %d)\n", __func__, dom->name, rc);
+			return rc;
+		}
+	}
 
 	return 0;
 }
