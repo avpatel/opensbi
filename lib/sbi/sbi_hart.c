@@ -1,4 +1,4 @@
-/*
+/*sbi_hart.
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Western Digital Corporation or its affiliates.
@@ -21,6 +21,7 @@
 #include <sbi/sbi_pmu.h>
 #include <sbi/sbi_string.h>
 #include <sbi/sbi_trap.h>
+#include <sbi/sbi_hart_mpt.h>
 
 extern void __sbi_expected_trap(void);
 extern void __sbi_expected_trap_hext(void);
@@ -730,6 +731,11 @@ int sbi_hart_init(struct sbi_scratch *scratch, bool cold_boot)
 	if (cold_boot) {
 		rc = sbi_hart_pmp_init(scratch);
 		if (rc)
+			return rc;
+
+		/* Smmpt is optional. Continue if the Smmpt is not present. */
+		rc = sbi_mpt_init();
+		if (rc && rc != SBI_ENODEV)
 			return rc;
 	}
 
