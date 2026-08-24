@@ -108,3 +108,5 @@ libsbi-objs-y += sbi_expected_trap.o
 libsbi-objs-y += sbi_cppc.o
 libsbi-objs-$(CC_SUPPORT_VECTOR) += sbi_vector.o
 libsbi-objs-y += sbi_fp.o
+libsbi-objs-y += sbi_hart_mpt.o
+libsbi-objs-y += sbi_mpt.o
