@@ -12,6 +12,9 @@
 
 #include <sbi/sbi_list.h>
 
+/** Macro for seconds to microseconds conversion */
+#define SEC_TO_MICROSEC		1000000ULL
+
 /** Timer event re-start details */
 struct sbi_timer_event_restart {
 	/** Flag indicating whether event re-start is required */
@@ -87,6 +90,15 @@ struct sbi_timer_device {
 };
 
 struct sbi_scratch;
+
+/** Compute timer value in given unit sec from timer tick delta */
+u64 sbi_timer_convert_ticks(ulong from_ticks, u64 unit_freq);
+
+/** Compute microseconds from timer tick delta */
+static inline u64 sbi_timer_ticks_to_usec(ulong ticks)
+{
+	return sbi_timer_convert_ticks(ticks, SEC_TO_MICROSEC);
+}
 
 /** Compute timer value delta based on arbitary units */
 u64 sbi_timer_compute_delta(ulong units, u64 unit_freq);

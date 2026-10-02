@@ -58,6 +58,11 @@ static void nop_delay_fn(void *opaque)
 	cpu_relax();
 }
 
+u64 sbi_timer_convert_ticks(ulong from_ticks, u64 unit_freq)
+{
+	return (from_ticks * unit_freq) / ((u64)timer_dev->timer_freq);
+}
+
 u64 sbi_timer_compute_delta(ulong units, u64 unit_freq)
 {
 	u64 delta;
