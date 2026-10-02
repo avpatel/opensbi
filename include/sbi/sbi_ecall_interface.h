@@ -38,6 +38,7 @@
 #define SBI_EXT_SSE				0x535345
 #define SBI_EXT_FWFT				0x46574654
 #define SBI_EXT_MPXY				0x4D505859
+#define SBI_EXT_WDT				0x574454
 
 /* SBI function IDs for BASE extension*/
 #define SBI_EXT_BASE_GET_SPEC_VERSION		0x0
@@ -491,6 +492,38 @@ enum sbi_sse_state {
 #define SBI_MPXY_NOTIF_HDR_RETURNED_OFFSET	0x04
 #define SBI_MPXY_NOTIF_HDR_LOST_OFFSET		0x08
 #define SBI_MPXY_NOTIF_HDR_RESERVED_OFFSET	0x0C
+
+/* SBI function IDs for WDT extension */
+#define SBI_EXT_WATCHDOG_READ_ATTRIBUTE			0x0
+#define SBI_EXT_WATCHDOG_WRITE_ATTRIBUTE		0x1
+#define SBI_EXT_WATCHDOG_WRITE_NOTIF_MSI_MESSAGE	0x2
+#define SBI_EXT_WATCHDOG_START				0x3
+#define SBI_EXT_WATCHDOG_STOP				0x4
+#define SBI_EXT_WATCHDOG_PAT				0x5
+
+/* SBI WDT Attributes. */
+enum sbi_wdt_attr_id {
+	/* MSI and SSE capability flags */
+	SBI_WDT_CAPABILITY		= 0x00000000,
+	/* Watchdog state */
+	SBI_WDT_STATE			= 0x00000001,
+	/* Minimum watchdog timeout supported in us */
+	SBI_WDT_MIN_PERIOD		= 0x00000002,
+	/* Watchdog timeout period in us */
+	SBI_WDT_PERIOD			= 0x00000003,
+	/* Time left until watchdog expiry in us */
+	SBI_WDT_TIME_LEFT		= 0x00000004,
+	/* Watchdog pretimeout in us */
+	SBI_WDT_NOTIF_TIME		= 0x00000005,
+	/* MSI target address low 32-bit */
+	SBI_WDT_NOTIF_MSI_ADDR_LOW	= 0x00000006,
+	/* MSI target address high 32-bit */
+	SBI_WDT_NOTIF_MSI_ADDR_HIGH	= 0x00000007,
+	/* MSI data */
+	SBI_WDT_NOTIF_MSI_DATA		= 0x00000008,
+	SBI_WDT_ATTR_MAX		= 0x00000009,
+	SBI_WDT_ATTR_RESERVED_MAX	= 0xFFFFFFFF
+};
 
 /* SBI base specification related macros */
 #define SBI_SPEC_VERSION_MAJOR_OFFSET		24
