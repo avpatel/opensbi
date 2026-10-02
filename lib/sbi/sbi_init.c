@@ -35,6 +35,7 @@
 #include <sbi/sbi_tlb.h>
 #include <sbi/sbi_version.h>
 #include <sbi/sbi_unit_test.h>
+#include <sbi/sbi_wdt.h>
 
 #define BANNER                                              \
 	"   ____                    _____ ____ _____\n"     \
@@ -371,6 +372,13 @@ static void __noreturn init_coldboot(struct sbi_scratch *scratch, u32 hartid)
 	rc = sbi_mpxy_init(scratch);
 	if (rc) {
 		sbi_printf("%s: mpxy init failed (error %d)\n", __func__, rc);
+		sbi_hart_hang();
+	}
+
+	/* Initialise the watchdog*/
+	rc = sbi_watchdog_init();
+	if (rc) {
+		sbi_printf("%s: watchdog init failed (error %d)\n", __func__, rc);
 		sbi_hart_hang();
 	}
 

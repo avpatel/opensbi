@@ -106,5 +106,6 @@ endif
 libsbi-objs-y += sbi_unpriv.o
 libsbi-objs-y += sbi_expected_trap.o
 libsbi-objs-y += sbi_cppc.o
+libsbi-objs-y += sbi_wdt.o
 libsbi-objs-$(CC_SUPPORT_VECTOR) += sbi_vector.o
 libsbi-objs-y += sbi_fp.o
