@@ -95,4 +95,8 @@ config SBI_ECALL_SSE
 config SBI_ECALL_MPXY
 	bool "MPXY extension"
 	default y
+
+config SBI_ECALL_WDT
+	bool "WDT extension"
+	default y
 endmenu
