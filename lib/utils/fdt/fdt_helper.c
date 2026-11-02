@@ -407,13 +407,56 @@ static void fdt_parse_isa_extensions_one_hart(const char *isa,
 	}
 }
 
+static int fdt_parse_isa_extensions_cpu(const void *fdt, int cpu_offset,
+					unsigned long *extensions)
+{
+	const fdt32_t *val;
+	int len, err;
+
+	val = fdt_getprop(fdt, cpu_offset, "riscv,isa-extensions", &len);
+	if (val && len > 0) {
+		fdt_parse_isa_extensions_one_hart((const char *)val,
+						  extensions, len);
+		return 0;
+	}
+
+	val = fdt_getprop(fdt, cpu_offset, "riscv,isa", &len);
+	if (!val || len <= 0)
+		return SBI_ENOENT;
+
+	err = fdt_parse_isa_one_hart((const char *)val, extensions);
+
+	return err;
+}
+
+bool fdt_cpu_has_extension(const void *fdt, int cpu_offset,
+			   enum sbi_hart_extensions ext)
+{
+	int err;
+	bool is_ext;
+
+	DECLARE_BITMAP(extensions, SBI_HART_EXT_MAX);
+	bitmap_zero(extensions, SBI_HART_EXT_MAX);
+
+	if (!fdt || ext >= SBI_HART_EXT_MAX)
+		return false;
+
+	err = fdt_parse_isa_extensions_cpu(fdt, cpu_offset, extensions);
+	if (err)
+		return false;
+
+
+	is_ext = __test_bit(ext, extensions) ? true : false;
+
+	return is_ext;
+}
+
 int fdt_parse_isa_extensions_all_harts(const void *fdt)
 {
 	u32 hartid;
-	const fdt32_t *val;
 	struct sbi_scratch *scratch;
 	struct sbi_hart_features *hfeatures;
-	int err, cpu_offset, cpus_offset, len;
+	int err, cpu_offset, cpus_offset;
 
 	if (!fdt)
 		return SBI_EINVAL;
@@ -438,18 +481,8 @@ int fdt_parse_isa_extensions_all_harts(const void *fdt)
 		if (!hfeatures)
 			return SBI_ENOENT;
 
-		val = fdt_getprop(fdt, cpu_offset, "riscv,isa-extensions", &len);
-		if (val && len > 0) {
-			fdt_parse_isa_extensions_one_hart((const char *)val,
-							  hfeatures->extensions, len);
-			continue;
-		}
-
-		val = fdt_getprop(fdt, cpu_offset, "riscv,isa", &len);
-		if (!val || len <= 0)
-			return SBI_ENOENT;
-
-		err = fdt_parse_isa_one_hart((const char *)val, hfeatures->extensions);
+		err = fdt_parse_isa_extensions_cpu(fdt, cpu_offset,
+						   hfeatures->extensions);
 		if (err)
 			return err;
 	}
