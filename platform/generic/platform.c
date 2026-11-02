@@ -33,7 +33,7 @@
 /* List of platform override modules generated at compile time */
 extern const struct fdt_driver *const platform_override_modules[];
 
-static u32 fw_platform_calculate_heap_size(u32 hart_count)
+static u32 fw_platform_calculate_heap_size(u32 hart_count, bool has_smsd)
 {
 	u32 heap_size;
 
@@ -42,10 +42,21 @@ static u32 fw_platform_calculate_heap_size(u32 hart_count)
 	/* For TLB fifo */
 	heap_size += SBI_TLB_INFO_SIZE * (hart_count) * (hart_count);
 
+	/*
+	 * MPT table budget, only when a hart implements Smsd.
+	 * 1 MiB memory for MPT allocated currently.
+	 *
+	 * TODO: Need better way to get the memory budget based on active
+	 * MPT mode.
+	 */
+	if (has_smsd)
+		heap_size += 1024 * 1024;
+
 	return BIT_ALIGN(heap_size, HEAP_BASE_ALIGN);
 }
 
-static u32 fw_platform_get_heap_size(const void *fdt, u32 hart_count)
+static u32 fw_platform_get_heap_size(const void *fdt, u32 hart_count,
+				     bool has_smsd)
 {
 	int chosen_offset, config_offset, len;
 	const fdt32_t *val;
@@ -64,7 +75,7 @@ static u32 fw_platform_get_heap_size(const void *fdt, u32 hart_count)
 		return BIT_ALIGN(fdt32_to_cpu(*val), HEAP_BASE_ALIGN);
 
 default_config:
-	return fw_platform_calculate_heap_size(hart_count);
+	return fw_platform_calculate_heap_size(hart_count, has_smsd);
 }
 
 extern struct sbi_platform platform;
@@ -149,6 +160,7 @@ unsigned long fw_platform_init(unsigned long arg0, unsigned long arg1,
 	int rc, root_offset, cpus_offset, cpu_offset, len;
 	unsigned long cbom_block_size = 0;
 	unsigned long tmp = 0;
+	bool has_smsd = false;
 
 	root_offset = fdt_path_offset(fdt, "/");
 	if (root_offset < 0)
@@ -177,6 +189,9 @@ unsigned long fw_platform_init(unsigned long arg0, unsigned long arg1,
 
 		generic_hart_index2id[hart_count++] = hartid;
 
+		if (fdt_cpu_has_extension(fdt, cpu_offset, SBI_HART_EXT_SMSD))
+			has_smsd = true;
+
 		rc = fdt_parse_cbom_block_size(fdt, cpu_offset, &tmp);
 		if (rc)
 			continue;
@@ -184,7 +199,7 @@ unsigned long fw_platform_init(unsigned long arg0, unsigned long arg1,
 	}
 
 	platform.hart_count = hart_count;
-	platform.heap_size = fw_platform_get_heap_size(fdt, hart_count);
+	platform.heap_size = fw_platform_get_heap_size(fdt, hart_count, has_smsd);
 	platform_has_mlevel_imsic = fdt_check_imsic_mlevel(fdt);
 	platform.cbom_block_size = cbom_block_size;
 
