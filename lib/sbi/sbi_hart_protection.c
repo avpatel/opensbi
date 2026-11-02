@@ -12,21 +12,37 @@
 
 static SBI_LIST_HEAD(hart_protection_list);
 
-static struct sbi_hart_protection *__hart_memory_protection_best(void)
+static struct sbi_hart_protection *
+__hart_memory_protection_best(enum sbi_hart_protection_memory_class memclass)
 {
 	struct sbi_hart_protection *pos;
 
 	sbi_list_for_each_entry(pos, &hart_protection_list, head) {
-		if (pos->type == SBI_HART_PROTECTION_TYPE_MEMORY)
+		if (pos->type == SBI_HART_PROTECTION_TYPE_MEMORY &&
+		    pos->memory_class == memclass)
 			return pos;
 	}
 
 	return NULL;
 }
 
+/*
+ * Select the highest rating protection mechanism from each class
+ */
+static bool __hart_protection_selected(struct sbi_hart_protection *hprot)
+{
+	switch (hprot->type) {
+	case SBI_HART_PROTECTION_TYPE_MEMORY:
+		return hprot == __hart_memory_protection_best(hprot->memory_class);
+	case SBI_HART_PROTECTION_TYPE_ID:
+		return true;
+	default:
+		return false;
+	}
+}
+
 void sbi_hart_protection_get_str(char *out_str, int out_str_size)
 {
-	bool memory_protect_done = false;
 	struct sbi_hart_protection *pos;
 	int offset = 0;
 
@@ -35,11 +51,8 @@ void sbi_hart_protection_get_str(char *out_str, int out_str_size)
 	sbi_memset(out_str, 0, out_str_size);
 
 	sbi_list_for_each_entry(pos, &hart_protection_list, head) {
-		if (pos->type == SBI_HART_PROTECTION_TYPE_MEMORY) {
-			if (memory_protect_done)
-				continue;
-			memory_protect_done = true;
-		}
+		if (!__hart_protection_selected(pos))
+			continue;
 		sbi_snprintf(out_str + offset, out_str_size - offset, "%s,", pos->name);
 		offset = offset + sbi_strlen(pos->name) + 1;
 	}
@@ -58,6 +71,9 @@ int sbi_hart_protection_register(struct sbi_hart_protection *hprot)
 	if (!hprot)
 		return SBI_EINVAL;
 	if (hprot->type >= SBI_HART_PROTECTION_TYPE_MAX)
+		return SBI_EINVAL;
+	if (hprot->type == SBI_HART_PROTECTION_TYPE_MEMORY &&
+	    hprot->memory_class >= SBI_HART_PROTECTION_MEMORY_CLASS_MAX)
 		return SBI_EINVAL;
 
 	sbi_list_for_each_entry(pos, &hart_protection_list, head) {
@@ -108,24 +124,11 @@ static void __hart_protection_unconfigure(struct sbi_scratch *scratch,
 int sbi_hart_protection_configure(struct sbi_scratch *scratch,
 				  struct sbi_domain *dom)
 {
-	bool do_configure, memory_protect_done = false;
 	struct sbi_hart_protection *hprot;
 	int ret;
 
 	sbi_list_for_each_entry(hprot, &hart_protection_list, head) {
-		do_configure = false;
-		switch (hprot->type) {
-		case SBI_HART_PROTECTION_TYPE_MEMORY:
-			do_configure = !memory_protect_done;
-			memory_protect_done = true;
-			break;
-		case SBI_HART_PROTECTION_TYPE_ID:
-			do_configure = true;
-			break;
-		default:
-			break;
-		}
-		if (!do_configure)
+		if (!__hart_protection_selected(hprot))
 			continue;
 
 		ret = __hart_protection_configure(scratch, hprot, dom);
@@ -139,24 +142,10 @@ int sbi_hart_protection_configure(struct sbi_scratch *scratch,
 void sbi_hart_protection_unconfigure(struct sbi_scratch *scratch,
 				     struct sbi_domain *dom)
 {
-
-	bool do_unconfigure, memory_protect_done = false;
 	struct sbi_hart_protection *hprot;
 
 	sbi_list_for_each_entry(hprot, &hart_protection_list, head) {
-		do_unconfigure = false;
-		switch (hprot->type) {
-		case SBI_HART_PROTECTION_TYPE_MEMORY:
-			do_unconfigure = !memory_protect_done;
-			memory_protect_done = true;
-			break;
-		case SBI_HART_PROTECTION_TYPE_ID:
-			do_unconfigure = true;
-			break;
-		default:
-			break;
-		}
-		if (!do_unconfigure)
+		if (!__hart_protection_selected(hprot))
 			continue;
 
 		__hart_protection_unconfigure(scratch, hprot, dom);
@@ -167,24 +156,11 @@ int sbi_hart_protection_reconfigure(struct sbi_scratch *scratch,
 				    struct sbi_domain *current_dom,
 				    struct sbi_domain *next_dom)
 {
-	bool do_reconfigure, memory_protect_done = false;
 	struct sbi_hart_protection *hprot;
 	int ret;
 
 	sbi_list_for_each_entry(hprot, &hart_protection_list, head) {
-		do_reconfigure = false;
-		switch (hprot->type) {
-		case SBI_HART_PROTECTION_TYPE_MEMORY:
-			do_reconfigure = !memory_protect_done;
-			memory_protect_done = true;
-			break;
-		case SBI_HART_PROTECTION_TYPE_ID:
-			do_reconfigure = true;
-			break;
-		default:
-			break;
-		}
-		if (!do_reconfigure)
+		if (!__hart_protection_selected(hprot))
 			continue;
 
 		__hart_protection_unconfigure(scratch, hprot, current_dom);
@@ -198,7 +174,8 @@ int sbi_hart_protection_reconfigure(struct sbi_scratch *scratch,
 
 int sbi_hart_protection_temp_map_range(unsigned long base, unsigned long size)
 {
-	struct sbi_hart_protection *hprot = __hart_memory_protection_best();
+	struct sbi_hart_protection *hprot =
+		__hart_memory_protection_best(SBI_HART_PROTECTION_MEMORY_CLASS_PMP);
 
 	if (!hprot || !hprot->temp_map_range)
 		return 0;
@@ -208,7 +185,8 @@ int sbi_hart_protection_temp_map_range(unsigned long base, unsigned long size)
 
 int sbi_hart_protection_temp_unmap_range(unsigned long base, unsigned long size)
 {
-	struct sbi_hart_protection *hprot = __hart_memory_protection_best();
+	struct sbi_hart_protection *hprot =
+		__hart_memory_protection_best(SBI_HART_PROTECTION_MEMORY_CLASS_PMP);
 
 	if (!hprot || !hprot->temp_unmap_range)
 		return 0;

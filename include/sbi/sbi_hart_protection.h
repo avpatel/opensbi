@@ -20,6 +20,23 @@ enum sbi_hart_protection_type {
 	SBI_HART_PROTECTION_TYPE_MAX
 };
 
+/**
+ * Hart protection class for memory protection.
+ *
+ * Memory protection mechanisms of the same class use the same
+ * hardware for memory access which makes them mutually exclusive and
+ * among those the rating will choose which one is active.
+ * Mechanisms of different classes can work together so a hart can have
+ * PMP + MPT or ePMP + MPT.
+ */
+enum sbi_hart_protection_memory_class {
+	/** PMP CSRs: pmp, epmp */
+	SBI_HART_PROTECTION_MEMORY_CLASS_PMP = 0,
+	/** mmpt CSR: MPT (Smsd) */
+	SBI_HART_PROTECTION_MEMORY_CLASS_MPT,
+	SBI_HART_PROTECTION_MEMORY_CLASS_MAX
+};
+
 /** Representation of hart protection mechanism */
 struct sbi_hart_protection {
 	/** List head */
@@ -30,6 +47,9 @@ struct sbi_hart_protection {
 
 	/** Type of the hart protection mechanism */
 	enum sbi_hart_protection_type type;
+
+	/** Hardware programmed by the mechanism */
+	enum sbi_hart_protection_memory_class memory_class;
 
 	/** Ratings of the hart protection mechanism (higher is better) */
 	unsigned long rating;

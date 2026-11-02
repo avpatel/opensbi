@@ -426,6 +426,7 @@ static struct sbi_hart_protection pmp_protection = {
 	.name = "pmp",
 	.rating = 100,
 	.type = SBI_HART_PROTECTION_TYPE_MEMORY,
+	.memory_class = SBI_HART_PROTECTION_MEMORY_CLASS_PMP,
 	.configure = sbi_hart_oldpmp_configure,
 	.unconfigure = sbi_hart_pmp_unconfigure,
 };
@@ -434,6 +435,7 @@ static struct sbi_hart_protection epmp_protection = {
 	.name = "epmp",
 	.rating = 200,
 	.type = SBI_HART_PROTECTION_TYPE_MEMORY,
+	.memory_class = SBI_HART_PROTECTION_MEMORY_CLASS_PMP,
 	.configure = sbi_hart_smepmp_configure,
 	.unconfigure = sbi_hart_pmp_unconfigure,
 	.temp_map_range = sbi_hart_smepmp_temp_map_range,
