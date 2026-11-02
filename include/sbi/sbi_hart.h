@@ -97,6 +97,8 @@ enum sbi_hart_extensions {
 	SBI_HART_EXT_F,
 	/** Hart has D extension */
 	SBI_HART_EXT_D,
+	/** Hart has Smsd extension */
+	SBI_HART_EXT_SMSD,
 
 	/** Maximum index of Hart extension */
 	SBI_HART_EXT_MAX,
