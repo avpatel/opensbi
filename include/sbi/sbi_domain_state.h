@@ -40,6 +40,18 @@ struct sbi_domain_state {
 	/** Optional callback to setup domain state */
 	int (*state_setup)(struct sbi_domain *dom,
 			  struct sbi_domain_state *state, void *state_ptr);
+	/**
+	 * Optional callback to finalize domain state
+	 *
+	 * Called for each domain from sbi_domain_finalize() after all
+	 * domains are registered and memory regions are final.
+	 *
+	 * State from the domain memory regions must be setup here instead
+	 * of state_setup()
+	 */
+	int (*state_finalize)(struct sbi_domain *dom,
+			      struct sbi_domain_state *state, void *state_ptr);
+
 	/** Optional callback to cleanup domain state */
 	void (*state_cleanup)(struct sbi_domain *dom,
 			     struct sbi_domain_state *state, void *state_ptr);
@@ -63,6 +75,16 @@ void *sbi_domain_state_ptr(struct sbi_domain *dom, struct sbi_domain_state *stat
  * Note: This function is used internally within domain framework.
  */
 int sbi_domain_setup_state(struct sbi_domain *dom);
+
+/**
+ * Finalize all domain state for a domain
+ * @param dom pointer to domain
+ *
+ * @return 0 on success and negative error code on failure
+ *
+ * Note: This function is used internally within domain framework.
+ */
+int sbi_domain_finalize_state(struct sbi_domain *dom);
 
 /**
  * Cleanup all domain state for a domain

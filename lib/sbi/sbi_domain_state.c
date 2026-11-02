@@ -84,6 +84,31 @@ int sbi_domain_setup_state(struct sbi_domain *dom)
 	return 0;
 }
 
+int sbi_domain_finalize_state(struct sbi_domain *dom)
+{
+	struct sbi_domain_state *state;
+	void *state_ptr;
+	int rc;
+
+	if (!dom)
+		return SBI_EINVAL;
+
+	sbi_list_for_each_entry(state, &state_list, head) {
+		if (!state->state_finalize)
+			continue;
+
+		state_ptr = sbi_domain_state_ptr(dom, state);
+		if (!state_ptr)
+			continue;
+
+		rc = state->state_finalize(dom, state, state_ptr);
+		if (rc)
+			return rc;
+	}
+
+	return 0;
+}
+
 void sbi_domain_cleanup_state(struct sbi_domain *dom)
 {
 	struct sbi_domain_state *state;
